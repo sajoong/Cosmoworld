@@ -1,1 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>코스모월드 통합 CS 시스템</title>
+    <link rel="stylesheet" href="/css/global.css" />
+    <style>
+        .dashboard {
+            max-width: 980px;
+            margin: 26px auto 40px;
+            padding: 0 16px;
+        }
+
+        .brand-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #1f4aa1;
+            font-size: 36px;
+            font-weight: 800;
+            margin: 8px 0 22px;
+        }
+
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            object-fit: cover;
+            box-shadow: 0 5px 14px rgba(35, 122, 216, 0.24);
+            flex: 0 0 auto;
+            background: #ffffff;
+        }
+
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 26px;
+        }
+
+        .quick-card {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: #fff;
+            font-size: 30px;
+            font-weight: 800;
+            border-radius: 18px;
+            min-height: 88px;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+
+        .quick-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 24px rgba(15, 23, 42, 0.2);
+        }
+
+        .quick-card.cs {
+            background: linear-gradient(180deg, #4b89ef, #3d7be8);
+        }
+
+        .quick-card.as {
+            background: linear-gradient(180deg, #2fc468, #20ae55);
+        }
+
+        .quick-card.acc {
+            color: #243047;
+            background: linear-gradient(180deg, #ffc82f, #efb600);
+        }
+
+        .section-title {
+            margin: 0 0 12px;
+            color: #1f4aa1;
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        .list-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 15px;
+        }
+
+        .list-table th,
+        .list-table td {
+            border: 1px solid #cfdae9;
+            padding: 12px;
+            text-align: left;
+        }
+
+        .list-table thead th {
+            background: #d9e7fb;
+            color: #1f4aa1;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .status {
+            color: #2b5fc8;
+            font-weight: 700;
+        }
+
+        .empty {
+            color: #64748b;
+            text-align: center;
+        }
+
+        @media (max-width: 840px) {
+            .brand-bar {
+                font-size: 26px;
+            }
+
+            .quick-links {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-card {
+                font-size: 26px;
+                min-height: 76px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="dashboard">
+        <div class="brand-bar" aria-label="시스템 타이틀">
+            <img class="brand-logo" src="/assets/logo.png" alt="코스모월드 로고" />
+            <span>코스모월드 통합 CS 시스템</span>
+        </div>
+
+        <nav class="quick-links" aria-label="주요 메뉴">
+            <a class="quick-card cs" href="/pages/cs.html">CS 접수</a>
+            <a class="quick-card as" href="/pages/as.html">AS 처리</a>
+            <a class="quick-card acc" href="/pages/acc.html">ACC 처리</a>
+        </nav>
+
+        <section class="card">
+            <h2 class="section-title">CS 목록</h2>
+            <div class="table-wrap">
+                <table class="list-table">
+                    <thead>
+                        <tr>
+                            <th>지점명</th>
+                            <th>문의분류</th>
+                            <th>요청시점</th>
+                            <th>상태</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cs-tbody">
+                        <tr>
+                            <td class="empty" colspan="4">데이터를 불러오는 중입니다.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script type="module">
+        import { db } from '/js/firebase-db.js';
+        import { renderNavbar } from '/js/navbar.js';
+        import {
+            collection,
+            onSnapshot,
+            orderBy,
+            query
+        } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+
+        renderNavbar('home');
+
+        const tbody = document.getElementById('cs-tbody');
+        const CS_COLLECTION = 'cs_requests';
+
+        function formatDateTime(value) {
+            if (!value) return '-';
+            const date = value?.toDate ? value.toDate() : new Date(value);
+            if (Number.isNaN(date.getTime())) return '-';
+            return new Intl.DateTimeFormat('ko-KR', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            }).format(date);
+        }
+
+        function drawRows(rows) {
+            tbody.innerHTML = '';
+
+            if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td class="empty" colspan="4">등록된 CS 요청이 없습니다.</td></tr>';
+                return;
+            }
+
+            rows.forEach((item) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.branchName ?? '-'}</td>
+                    <td>${item.category ?? '-'}</td>
+                    <td>${formatDateTime(item.requestedAt || item.createdAt)}</td>
+                    <td class="status">${item.status ?? '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        const q = query(collection(db, CS_COLLECTION), orderBy('createdAt', 'desc'));
+
+        onSnapshot(
+            q,
+            (snap) => {
+                const rows = [];
+                snap.forEach((docSnap) => {
+                    rows.push(docSnap.data());
+                });
+                drawRows(rows);
+            },
+            (error) => {
+                console.error('CS 목록 실시간 로드 실패:', error);
+                tbody.innerHTML = '<tr><td class="empty" colspan="4">목록을 불러오지 못했습니다.</td></tr>';
+            }
+        );
+    </script>
+</body>
+</html>
 
